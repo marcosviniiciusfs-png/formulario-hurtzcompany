@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
     // Check if there's a valid collaborator session
     const collabToken = request.cookies.get(COLLAB_COOKIE)?.value
     if (collabToken) {
-      const payload = verifyCollabSession(collabToken)
+      const payload = await verifyCollabSession(collabToken)
       if (payload) {
         const formIdMatch = request.nextUrl.pathname.match(/\/dashboard\/forms\/([a-f0-9-]+)/)
         if (formIdMatch && formIdMatch[1] === payload.form_id) {
@@ -70,7 +70,7 @@ export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith('/dashboard')) {
     const collabToken = request.cookies.get(COLLAB_COOKIE)?.value
     if (collabToken) {
-      const payload = verifyCollabSession(collabToken)
+      const payload = await verifyCollabSession(collabToken)
       if (payload) {
         supabaseResponse.headers.set('x-collab-role', payload.role)
         supabaseResponse.headers.set('x-collab-form-id', payload.form_id)

@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 })
   }
 
-  const token = createCollabSession(collab.id, form.id, collab.role)
+  const token = await createCollabSession(collab.id, form.id, collab.role)
 
   const response = NextResponse.json({
     success: true,
