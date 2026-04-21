@@ -65,6 +65,14 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Você precisa estar logado')
 
+      // Ensure bucket exists
+      const { data: buckets } = await supabase.storage.listBuckets()
+      const bucketExists = buckets?.some(b => b.id === 'form-banners')
+      if (!bucketExists) {
+        const { error: createErr } = await supabase.storage.createBucket('form-banners', { public: true })
+        if (createErr) throw new Error('Erro ao criar storage: ' + createErr.message)
+      }
+
       const ext = file.name.split('.').pop() || 'png'
       const path = `${user.id}/${Date.now()}.${ext}`
 
