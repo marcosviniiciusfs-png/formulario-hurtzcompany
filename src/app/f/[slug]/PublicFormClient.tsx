@@ -1,7 +1,7 @@
 'use client'
 
 import { FormWithFields } from '@/types'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FormField } from '@/components/form/FormField'
 import { ThankYou } from '@/components/form/ThankYou'
 import { Loader2, Send } from 'lucide-react'
@@ -73,10 +73,29 @@ export function PublicFormClient({ form }: PublicFormClientProps) {
 
   const config = (form.configuracoes || {}) as Record<string, string>
 
+  useEffect(() => {
+    if (config.font_family && config.font_family !== 'Inter') {
+      const existing = document.querySelector(`link[data-hurtz-font="${config.font_family}"]`)
+      if (existing) return
+      const link = document.createElement('link')
+      link.href = `https://fonts.googleapis.com/css2?family=${config.font_family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
+      link.rel = 'stylesheet'
+      link.setAttribute('data-hurtz-font', config.font_family)
+      document.head.appendChild(link)
+    }
+  }, [config.font_family])
+
   return (
-    <div className="min-h-screen bg-gray-50" style={{ backgroundColor: config.bgColor || undefined }}>
+    <div className="min-h-screen bg-gray-50" style={{
+      backgroundColor: config.bgColor || undefined,
+      fontFamily: config.font_family && config.font_family !== 'Inter' ? `'${config.font_family}', sans-serif` : undefined,
+    }}>
       <div className="max-w-2xl mx-auto py-12 px-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* Banner */}
+          {config.banner_url && (
+            <img src={config.banner_url} alt="Banner" className="w-full h-48 object-cover" />
+          )}
           {/* Header */}
           <div className="p-8 border-b border-gray-100" style={{ backgroundColor: config.headerColor || undefined }}>
             <h1 className="text-2xl font-bold text-gray-900">{form.titulo}</h1>
