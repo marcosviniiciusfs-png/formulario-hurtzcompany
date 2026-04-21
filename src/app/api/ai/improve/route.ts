@@ -12,12 +12,13 @@ export async function POST(request: NextRequest) {
 
   const { titulo, descricao, fields } = await request.json()
 
-  const completion = await openai.chat.completions.create({
-    model: AI_MODEL,
-    messages: [
-      {
-        role: 'system',
-        content: `Você é um especialista em UX de formulários. Melhore o formulário fornecido: melhore labels, ajuste a ordem, adicione placeholders úteis, e corrija tipos de campos se necessário. Retorne o formulário completo melhorado no formato:
+  try {
+    const completion = await openai.chat.completions.create({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `Você é um especialista em UX de formulários. Melhore o formulário fornecido: melhore labels, ajuste a ordem, adicione placeholders úteis, e corrija tipos de campos se necessário. Retorne o formulário completo melhorado no formato:
 {
   "titulo": "...",
   "descricao": "...",
@@ -26,20 +27,23 @@ export async function POST(request: NextRequest) {
   ]
 }
 Responda APENAS com JSON.`,
-      },
-      {
-        role: 'user',
-        content: JSON.stringify({ titulo, descricao, fields }),
-      },
-    ],
-    response_format: { type: 'json_object' },
-    temperature: 0.5,
-  })
+        },
+        {
+          role: 'user',
+          content: JSON.stringify({ titulo, descricao, fields }),
+        },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.5,
+    })
 
-  const content = completion.choices[0]?.message?.content
-  if (!content) {
-    return NextResponse.json({ error: 'No response from AI' }, { status: 500 })
+    const content = completion.choices[0]?.message?.content
+    if (!content) {
+      return NextResponse.json({ error: 'No response from AI' }, { status: 500 })
+    }
+
+    return NextResponse.json(JSON.parse(content))
+  } catch {
+    return NextResponse.json({ error: 'Failed to improve form' }, { status: 500 })
   }
-
-  return NextResponse.json(JSON.parse(content))
 }
