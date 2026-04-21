@@ -92,15 +92,22 @@ export function PublicFormClient({ form }: PublicFormClientProps) {
     }}>
       <div className="max-w-2xl mx-auto py-12 px-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          {/* Banner */}
-          {config.banner_url && (
-            <img src={config.banner_url} alt="Banner" className="w-full h-48 object-cover" />
+          {/* Header: banner image OR color */}
+          {config.banner_url ? (
+            <div className="relative">
+              <img src={config.banner_url} alt="Banner" className="w-full h-52 object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-8">
+                <h1 className="text-2xl font-bold text-white drop-shadow-md">{form.titulo}</h1>
+                {form.descricao && <p className="text-white/80 mt-2 drop-shadow-sm">{form.descricao}</p>}
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 border-b border-gray-100" style={{ backgroundColor: config.headerColor || undefined }}>
+              <h1 className="text-2xl font-bold text-gray-900">{form.titulo}</h1>
+              {form.descricao && <p className="text-gray-500 mt-2">{form.descricao}</p>}
+            </div>
           )}
-          {/* Header */}
-          <div className="p-8 border-b border-gray-100" style={{ backgroundColor: config.headerColor || undefined }}>
-            <h1 className="text-2xl font-bold text-gray-900">{form.titulo}</h1>
-            {form.descricao && <p className="text-gray-500 mt-2">{form.descricao}</p>}
-          </div>
 
           {/* Fields */}
           <form onSubmit={handleSubmit} className="p-8 space-y-6">

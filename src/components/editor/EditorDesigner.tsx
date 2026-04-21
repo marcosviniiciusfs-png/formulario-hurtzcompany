@@ -2,8 +2,7 @@
 
 import { useFormEditorStore } from '@/stores/useFormEditorStore'
 import { useEffect, useState, useRef } from 'react'
-import { Palette, RotateCcw, Type, Image, Droplets } from 'lucide-react'
-import { createPortal } from 'react-dom'
+import { Palette, RotateCcw, Type, Image, Droplets, Upload, Loader2, X } from 'lucide-react'
 
 const FONT_OPTIONS = [
   { value: 'Inter', label: 'Inter (Padrão)' },
@@ -32,6 +31,8 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
   const { form, fields, updateForm } = useFormEditorStore()
   const config = (form.configuracoes || {}) as Record<string, string>
   const [expandedColor, setExpandedColor] = useState<'bg' | 'header' | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const updateConfig = (key: string, value: string) => {
     updateForm({ configuracoes: { ...form.configuracoes, [key]: value } })
@@ -41,11 +42,43 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
     updateForm({ configuracoes: {} })
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('Apenas imagens são permitidas')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Máximo 5MB')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/upload-banner', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      updateConfig('banner_url', data.url)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro no upload')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const removeBanner = () => {
+    updateConfig('banner_url', '')
+  }
+
   const bgColor = config.bgColor || '#f9fafb'
   const headerColor = config.headerColor || '#ffffff'
   const bannerUrl = config.banner_url || ''
   const fontFamily = config.font_family || 'Inter'
-
   const previewFields = fields.slice(0, 4)
 
   return (
@@ -70,14 +103,12 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
             <Droplets size={13} /> Cor de fundo
           </label>
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <input
-                type="color"
-                value={bgColor}
-                onChange={e => updateConfig('bgColor', e.target.value)}
-                className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0.5"
-              />
-            </div>
+            <input
+              type="color"
+              value={bgColor}
+              onChange={e => updateConfig('bgColor', e.target.value)}
+              className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0.5"
+            />
             <input
               type="text"
               value={config.bgColor || ''}
@@ -101,65 +132,87 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
           )}
         </div>
 
-        {/* Header Color */}
+        {/* Banner / Header Image */}
         <div className="p-4 border-b border-gray-100 space-y-3">
           <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
-            <Droplets size={13} /> Cor do cabeçalho
+            <Image size={13} /> Imagem do cabeçalho
           </label>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+
+          {bannerUrl ? (
+            <div className="relative rounded-lg overflow-hidden border border-gray-200 group">
+              <img src={bannerUrl} alt="Banner" className="w-full h-28 object-cover" />
+              <button onClick={removeBanner}
+                className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full p-1 hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity">
+                <X size={12} />
+              </button>
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+            </div>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="w-full border-2 border-dashed border-gray-200 rounded-lg p-4 flex flex-col items-center gap-2 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-colors disabled:opacity-50"
+            >
+              {uploading ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <Upload size={20} />
+              )}
+              <span className="text-xs">{uploading ? 'Enviando...' : 'Clique para enviar uma imagem'}</span>
+              <span className="text-[10px] text-gray-300">PNG, JPG, WEBP (máx. 5MB)</span>
+            </button>
+          )}
+
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+
+          {bannerUrl && (
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+              className="w-full text-xs text-gray-500 hover:text-gray-700 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
+              {uploading ? 'Enviando...' : 'Trocar imagem'}
+            </button>
+          )}
+
+          {!bannerUrl && (
+            <p className="text-[10px] text-gray-400">A imagem substitui a cor do cabeçalho quando definida.</p>
+          )}
+        </div>
+
+        {/* Header Color (only shown when no banner) */}
+        {!bannerUrl && (
+          <div className="p-4 border-b border-gray-100 space-y-3">
+            <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+              <Droplets size={13} /> Cor do cabeçalho
+            </label>
+            <div className="flex items-center gap-2">
               <input
                 type="color"
                 value={headerColor}
                 onChange={e => updateConfig('headerColor', e.target.value)}
                 className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0.5"
               />
-            </div>
-            <input
-              type="text"
-              value={config.headerColor || ''}
-              onChange={e => updateConfig('headerColor', e.target.value)}
-              placeholder="#ffffff"
-              className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono"
-            />
-            <button onClick={() => setExpandedColor(expandedColor === 'header' ? null : 'header')}
-              className="p-1 rounded hover:bg-gray-100">
-              <div className="w-5 h-5 rounded border border-gray-200" style={{ background: `conic-gradient(${PRESET_COLORS.join(', ')})` }} />
-            </button>
-          </div>
-          {expandedColor === 'header' && (
-            <div className="flex flex-wrap gap-1.5">
-              {PRESET_COLORS.map(c => (
-                <button key={c} onClick={() => updateConfig('headerColor', c)}
-                  className={`w-7 h-7 rounded-lg border-2 transition-transform hover:scale-110 ${headerColor === c ? 'border-blue-500 scale-110' : 'border-gray-200'}`}
-                  style={{ backgroundColor: c }} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Banner Image */}
-        <div className="p-4 border-b border-gray-100 space-y-3">
-          <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
-            <Image size={13} /> Imagem do banner
-          </label>
-          <input
-            type="url"
-            value={bannerUrl}
-            onChange={e => updateConfig('banner_url', e.target.value)}
-            placeholder="https://exemplo.com/imagem.jpg"
-            className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg"
-          />
-          {bannerUrl && (
-            <div className="relative rounded-lg overflow-hidden border border-gray-200">
-              <img src={bannerUrl} alt="Banner preview" className="w-full h-24 object-cover" />
-              <button onClick={() => updateConfig('banner_url', '')}
-                className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 hover:bg-black/70">
-                <RotateCcw size={12} />
+              <input
+                type="text"
+                value={config.headerColor || ''}
+                onChange={e => updateConfig('headerColor', e.target.value)}
+                placeholder="#ffffff"
+                className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono"
+              />
+              <button onClick={() => setExpandedColor(expandedColor === 'header' ? null : 'header')}
+                className="p-1 rounded hover:bg-gray-100">
+                <div className="w-5 h-5 rounded border border-gray-200" style={{ background: `conic-gradient(${PRESET_COLORS.join(', ')})` }} />
               </button>
             </div>
-          )}
-        </div>
+            {expandedColor === 'header' && (
+              <div className="flex flex-wrap gap-1.5">
+                {PRESET_COLORS.map(c => (
+                  <button key={c} onClick={() => updateConfig('headerColor', c)}
+                    className={`w-7 h-7 rounded-lg border-2 transition-transform hover:scale-110 ${headerColor === c ? 'border-blue-500 scale-110' : 'border-gray-200'}`}
+                    style={{ backgroundColor: c }} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Font Family */}
         <div className="p-4 space-y-3">
@@ -186,23 +239,33 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
             style={{
               backgroundColor: bgColor,
               fontFamily: fontFamily !== 'Inter' ? `'${fontFamily}', sans-serif` : undefined,
-              transform: 'none',
             }}
           >
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              {/* Banner */}
-              {bannerUrl && (
-                <img src={bannerUrl} alt="Banner" className="w-full h-28 object-cover" />
+              {/* Header: banner image OR color */}
+              {bannerUrl ? (
+                <div className="relative">
+                  <img src={bannerUrl} alt="Banner" className="w-full h-36 object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
+                    <h3 className="text-base font-bold text-white drop-shadow-md truncate">
+                      {form.titulo || 'Título do formulário'}
+                    </h3>
+                    {form.descricao && (
+                      <p className="text-white/80 text-xs mt-1 line-clamp-2 drop-shadow-sm">{form.descricao}</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-5 border-b border-gray-100" style={{ backgroundColor: headerColor || undefined }}>
+                  <h3 className="text-base font-bold text-gray-900 truncate">
+                    {form.titulo || 'Título do formulário'}
+                  </h3>
+                  {form.descricao && (
+                    <p className="text-gray-500 text-xs mt-1 line-clamp-2">{form.descricao}</p>
+                  )}
+                </div>
               )}
-              {/* Header */}
-              <div className="p-5 border-b border-gray-100" style={{ backgroundColor: headerColor || undefined }}>
-                <h3 className="text-base font-bold text-gray-900 truncate">
-                  {form.titulo || 'Título do formulário'}
-                </h3>
-                {form.descricao && (
-                  <p className="text-gray-500 text-xs mt-1 line-clamp-2">{form.descricao}</p>
-                )}
-              </div>
               {/* Fields Preview */}
               <div className="p-5 space-y-3">
                 {previewFields.length > 0 ? previewFields.map(f => (
@@ -234,7 +297,6 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
         </div>
       </div>
 
-      {/* Dynamic font loading for preview */}
       <FontLoader fontFamily={fontFamily} />
     </div>
   )
