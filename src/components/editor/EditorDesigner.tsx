@@ -3,7 +3,6 @@
 import { useFormEditorStore } from '@/stores/useFormEditorStore'
 import { useEffect, useState, useRef } from 'react'
 import { Palette, RotateCcw, Type, Image, Droplets, Upload, Loader2, X, Code, ExternalLink, CheckCircle2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 
 const FONT_OPTIONS = [
   { value: 'Inter', label: 'Inter (Padrão)' },
@@ -61,32 +60,15 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
 
     setUploading(true)
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Você precisa estar logado')
+      // Convert image to base64 data URL — works without any storage bucket
+      const reader = new FileReader()
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('Erro ao processar imagem'))
+        reader.readAsDataURL(file)
+      })
 
-      // Ensure bucket exists
-      const { data: buckets } = await supabase.storage.listBuckets()
-      const bucketExists = buckets?.some(b => b.id === 'form-banners')
-      if (!bucketExists) {
-        const { error: createErr } = await supabase.storage.createBucket('form-banners', { public: true })
-        if (createErr) throw new Error('Erro ao criar storage: ' + createErr.message)
-      }
-
-      const ext = file.name.split('.').pop() || 'png'
-      const path = `${user.id}/${Date.now()}.${ext}`
-
-      const { error: uploadErr } = await supabase.storage
-        .from('form-banners')
-        .upload(path, file, { contentType: file.type, upsert: true })
-
-      if (uploadErr) throw new Error(uploadErr.message)
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('form-banners')
-        .getPublicUrl(path)
-
-      updateConfig('banner_url', publicUrl)
+      updateConfig('banner_url', dataUrl)
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Erro no upload')
     } finally {
