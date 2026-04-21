@@ -2,7 +2,8 @@
 
 import { useFormEditorStore } from '@/stores/useFormEditorStore'
 import { useEffect, useState, useRef } from 'react'
-import { Palette, RotateCcw, Type, Image, Droplets, Upload, Loader2, X, Code } from 'lucide-react'
+import { Palette, RotateCcw, Type, Image, Droplets, Upload, Loader2, X, Code, ExternalLink, CheckCircle2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 const FONT_OPTIONS = [
   { value: 'Inter', label: 'Inter (Padrão)' },
@@ -32,6 +33,8 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
   const config = (form.configuracoes || {}) as Record<string, string>
   const [expandedColor, setExpandedColor] = useState<'bg' | 'header' | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const [pixelStatus, setPixelStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const updateConfig = (key: string, value: string) => {
@@ -45,26 +48,39 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setUploadError('')
 
     if (!file.type.startsWith('image/')) {
-      alert('Apenas imagens são permitidas')
+      setUploadError('Apenas imagens são permitidas (PNG, JPG, WEBP)')
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert('Máximo 5MB')
+      setUploadError('Imagem deve ter no máximo 5MB')
       return
     }
 
     setUploading(true)
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/upload-banner', { method: 'POST', body: formData })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      updateConfig('banner_url', data.url)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Você precisa estar logado')
+
+      const ext = file.name.split('.').pop() || 'png'
+      const path = `${user.id}/${Date.now()}.${ext}`
+
+      const { error: uploadErr } = await supabase.storage
+        .from('form-banners')
+        .upload(path, file, { contentType: file.type, upsert: true })
+
+      if (uploadErr) throw new Error(uploadErr.message)
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('form-banners')
+        .getPublicUrl(path)
+
+      updateConfig('banner_url', publicUrl)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erro no upload')
+      setUploadError(err instanceof Error ? err.message : 'Erro no upload')
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -73,6 +89,40 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
 
   const removeBanner = () => {
     updateConfig('banner_url', '')
+  }
+
+  const testPixel = async () => {
+    const pixelId = config.meta_pixel_id
+    if (!pixelId) return
+    setPixelStatus('testing')
+
+    try {
+      const slug = form.slug
+      if (!slug) {
+        setPixelStatus('error')
+        return
+      }
+
+      const res = await fetch(`/f/${slug}`, { method: 'GET' })
+      if (!res.ok) throw new Error()
+
+      const html = await res.text()
+      const hasPixel = html.includes(pixelId) || html.includes('fbevents.js') || html.includes('fbq')
+
+      if (hasPixel) {
+        setPixelStatus('ok')
+        setTimeout(() => setPixelStatus('idle'), 4000)
+      } else {
+        setPixelStatus('error')
+        setTimeout(() => setPixelStatus('idle'), 4000)
+      }
+    } catch {
+      const slug = form.slug
+      if (slug) {
+        window.open(`/f/${slug}`, '_blank')
+      }
+      setPixelStatus('idle')
+    }
   }
 
   const bgColor = config.bgColor || '#f9fafb'
@@ -104,19 +154,13 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
             <Droplets size={13} /> Cor de fundo
           </label>
           <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={bgColor}
+            <input type="color" value={bgColor}
               onChange={e => updateConfig('bgColor', e.target.value)}
-              className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0.5"
-            />
-            <input
-              type="text"
-              value={config.bgColor || ''}
+              className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0.5" />
+            <input type="text" value={config.bgColor || ''}
               onChange={e => updateConfig('bgColor', e.target.value)}
               placeholder="#f9fafb"
-              className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono"
-            />
+              className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" />
             <button onClick={() => setExpandedColor(expandedColor === 'bg' ? null : 'bg')}
               className="p-1 rounded hover:bg-gray-100">
               <div className="w-5 h-5 rounded border border-gray-200" style={{ background: `conic-gradient(${PRESET_COLORS.join(', ')})` }} />
@@ -133,7 +177,7 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
           )}
         </div>
 
-        {/* Banner / Header Image */}
+        {/* Banner Upload */}
         <div className="p-4 border-b border-gray-100 space-y-3">
           <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
             <Image size={13} /> Imagem do cabeçalho
@@ -146,25 +190,17 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
                 className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full p-1 hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity">
                 <X size={12} />
               </button>
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
             </div>
           ) : (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="w-full border-2 border-dashed border-gray-200 rounded-lg p-4 flex flex-col items-center gap-2 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-colors disabled:opacity-50"
-            >
-              {uploading ? (
-                <Loader2 size={20} className="animate-spin" />
-              ) : (
-                <Upload size={20} />
-              )}
-              <span className="text-xs">{uploading ? 'Enviando...' : 'Clique para enviar uma imagem'}</span>
-              <span className="text-[10px] text-gray-300">PNG, JPG, WEBP (máx. 5MB)</span>
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+              className="w-full border-2 border-dashed border-gray-300 rounded-lg p-5 flex flex-col items-center gap-2 text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-colors disabled:opacity-50 bg-gray-50/50">
+              {uploading ? <Loader2 size={20} className="animate-spin text-blue-500" /> : <Upload size={20} />}
+              <span className="text-xs font-medium">{uploading ? 'Enviando imagem...' : 'Clique para enviar imagem'}</span>
+              <span className="text-[10px] text-gray-400">PNG, JPG ou WEBP (máx. 5MB)</span>
             </button>
           )}
 
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+          <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFileUpload} className="hidden" />
 
           {bannerUrl && (
             <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
@@ -173,31 +209,29 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
             </button>
           )}
 
-          {!bannerUrl && (
+          {uploadError && (
+            <p className="text-[11px] text-red-500 bg-red-50 px-2 py-1.5 rounded-lg">{uploadError}</p>
+          )}
+
+          {!bannerUrl && !uploadError && (
             <p className="text-[10px] text-gray-400">A imagem substitui a cor do cabeçalho quando definida.</p>
           )}
         </div>
 
-        {/* Header Color (only shown when no banner) */}
+        {/* Header Color (only when no banner) */}
         {!bannerUrl && (
           <div className="p-4 border-b border-gray-100 space-y-3">
             <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
               <Droplets size={13} /> Cor do cabeçalho
             </label>
             <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={headerColor}
+              <input type="color" value={headerColor}
                 onChange={e => updateConfig('headerColor', e.target.value)}
-                className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0.5"
-              />
-              <input
-                type="text"
-                value={config.headerColor || ''}
+                className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0.5" />
+              <input type="text" value={config.headerColor || ''}
                 onChange={e => updateConfig('headerColor', e.target.value)}
                 placeholder="#ffffff"
-                className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono"
-              />
+                className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded-lg font-mono" />
               <button onClick={() => setExpandedColor(expandedColor === 'header' ? null : 'header')}
                 className="p-1 rounded hover:bg-gray-100">
                 <div className="w-5 h-5 rounded border border-gray-200" style={{ background: `conic-gradient(${PRESET_COLORS.join(', ')})` }} />
@@ -220,11 +254,9 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
           <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
             <Type size={13} /> Fonte
           </label>
-          <select
-            value={fontFamily}
+          <select value={fontFamily}
             onChange={e => updateConfig('font_family', e.target.value)}
-            className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg bg-white"
-          >
+            className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg bg-white">
             {FONT_OPTIONS.map(f => (
               <option key={f.value} value={f.value}>{f.label}</option>
             ))}
@@ -236,35 +268,54 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
           <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
             <Code size={13} /> Rastreamento (Meta Pixel)
           </label>
-          <input
-            type="text"
-            value={metaPixelId}
+          <input type="text" value={metaPixelId}
             onChange={e => updateConfig('meta_pixel_id', e.target.value)}
             placeholder="Ex: 123456789"
-            className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg font-mono"
-          />
+            className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg font-mono" />
           <p className="text-[10px] text-gray-400 leading-relaxed">
             Cole apenas o ID do Pixel. Eventos disparados automaticamente:
           </p>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-[10px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-              <span className="text-gray-500"><span className="font-mono text-gray-600">PageView</span> — ao carregar o formulário</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+              <span className="text-gray-600 font-mono">PageView</span>
+              <span className="text-gray-400">— ao carregar o formulário</span>
             </div>
             <div className="flex items-center gap-2 text-[10px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-              <span className="text-gray-500"><span className="font-mono text-gray-600">InitiateCheckout</span> — ao clicar "Enviar"</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+              <span className="text-gray-600 font-mono">InitiateCheckout</span>
+              <span className="text-gray-400">— ao clicar "Enviar"</span>
             </div>
             <div className="flex items-center gap-2 text-[10px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-              <span className="text-gray-500"><span className="font-mono text-gray-600">Lead</span> — na página de obrigado</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
+              <span className="text-gray-600 font-mono">Lead</span>
+              <span className="text-gray-400">— na página de obrigado</span>
             </div>
           </div>
+
           {metaPixelId && (
-            <button onClick={() => updateConfig('meta_pixel_id', '')}
-              className="text-[10px] text-red-400 hover:text-red-600">
-              Remover pixel
-            </button>
+            <div className="space-y-2 pt-1">
+              <button onClick={testPixel}
+                className="w-full flex items-center justify-center gap-1.5 text-xs py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                {pixelStatus === 'testing' ? (
+                  <><Loader2 size={12} className="animate-spin" /> Verificando...</>
+                ) : pixelStatus === 'ok' ? (
+                  <><CheckCircle2 size={12} className="text-green-500" /> Pixel detectado!</>
+                ) : pixelStatus === 'error' ? (
+                  <><X size={12} className="text-red-500" /> Pixel não encontrado</>
+                ) : (
+                  <><ExternalLink size={12} /> Testar Pixel</>
+                )}
+              </button>
+              <button onClick={() => { if (form.slug) window.open(`/f/${form.slug}`, '_blank') }}
+                className="w-full text-[10px] text-gray-400 hover:text-gray-600 py-1">
+                Abrir formulário em nova aba
+              </button>
+              <button onClick={() => updateConfig('meta_pixel_id', '')}
+                className="text-[10px] text-red-400 hover:text-red-600">
+                Remover pixel
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -272,54 +323,36 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
       {/* Live Preview */}
       <div className="flex-1 bg-gray-200 p-6 overflow-auto">
         <div className="mx-auto" style={{ maxWidth: 420 }}>
-          <div
-            className="rounded-xl shadow-lg overflow-hidden"
-            style={{
-              backgroundColor: bgColor,
-              fontFamily: fontFamily !== 'Inter' ? `'${fontFamily}', sans-serif` : undefined,
-            }}
-          >
+          <div className="rounded-xl shadow-lg overflow-hidden"
+            style={{ backgroundColor: bgColor, fontFamily: fontFamily !== 'Inter' ? `'${fontFamily}', sans-serif` : undefined }}>
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              {/* Header: banner image OR color */}
               {bannerUrl ? (
                 <div className="relative">
                   <img src={bannerUrl} alt="Banner" className="w-full h-36 object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <h3 className="text-base font-bold text-white drop-shadow-md truncate">
-                      {form.titulo || 'Título do formulário'}
-                    </h3>
-                    {form.descricao && (
-                      <p className="text-white/80 text-xs mt-1 line-clamp-2 drop-shadow-sm">{form.descricao}</p>
-                    )}
+                    <h3 className="text-base font-bold text-white drop-shadow-md truncate">{form.titulo || 'Título do formulário'}</h3>
+                    {form.descricao && <p className="text-white/80 text-xs mt-1 line-clamp-2 drop-shadow-sm">{form.descricao}</p>}
                   </div>
                 </div>
               ) : (
                 <div className="p-5 border-b border-gray-100" style={{ backgroundColor: headerColor || undefined }}>
-                  <h3 className="text-base font-bold text-gray-900 truncate">
-                    {form.titulo || 'Título do formulário'}
-                  </h3>
-                  {form.descricao && (
-                    <p className="text-gray-500 text-xs mt-1 line-clamp-2">{form.descricao}</p>
-                  )}
+                  <h3 className="text-base font-bold text-gray-900 truncate">{form.titulo || 'Título do formulário'}</h3>
+                  {form.descricao && <p className="text-gray-500 text-xs mt-1 line-clamp-2">{form.descricao}</p>}
                 </div>
               )}
-              {/* Fields Preview */}
               <div className="p-5 space-y-3">
                 {previewFields.length > 0 ? previewFields.map(f => (
                   <div key={f.id}>
                     <label className="text-xs font-medium text-gray-700 mb-1 block">
-                      {f.label}
-                      {f.obrigatorio && <span className="text-red-400 ml-0.5">*</span>}
+                      {f.label}{f.obrigatorio && <span className="text-red-400 ml-0.5">*</span>}
                     </label>
                     <div className="w-full h-8 bg-gray-50 border border-gray-200 rounded-lg px-2.5 flex items-center">
                       <span className="text-[11px] text-gray-300">{f.placeholder || f.label}</span>
                     </div>
                   </div>
                 )) : (
-                  <div className="text-center py-6 text-gray-300 text-xs">
-                    Adicione campos no Editor para visualizar
-                  </div>
+                  <div className="text-center py-6 text-gray-300 text-xs">Adicione campos no Editor para visualizar</div>
                 )}
                 <div className="pt-2">
                   <div className="w-full h-9 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -328,9 +361,7 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
                 </div>
               </div>
             </div>
-            <p className="text-center text-[10px] text-gray-400 mt-3 pb-2">
-              Criado com Hurtz Forms
-            </p>
+            <p className="text-center text-[10px] text-gray-400 mt-3 pb-2">Criado com Hurtz Forms</p>
           </div>
         </div>
       </div>
@@ -352,6 +383,5 @@ function FontLoader({ fontFamily }: { fontFamily: string }) {
       document.head.appendChild(link)
     }
   }, [fontFamily])
-
   return null
 }

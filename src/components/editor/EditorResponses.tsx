@@ -214,32 +214,33 @@ export function EditorResponses({ formId }: EditorResponsesProps) {
 
       {/* Spreadsheet Grid */}
       <div className="flex-1 overflow-auto" ref={gridRef}>
-        <table className="w-full text-sm border-collapse">
+        <table className="w-full text-sm border-collapse border border-gray-300">
           <thead>
-            <tr className="border-b border-gray-200">
-              <th className="sticky left-0 z-30 bg-gray-50 px-3 py-2 text-left text-xs font-medium text-gray-500 w-44 min-w-[176px] border-r border-gray-200">
-                <button onClick={() => toggleSort('created_at')} className="flex items-center gap-1 hover:text-gray-700">
+            <tr className="border-b-2 border-gray-400 bg-gray-100">
+              <th className="sticky left-0 z-30 bg-gray-100 px-3 py-2.5 text-left text-xs font-semibold text-gray-600 w-44 min-w-[176px] border-r-2 border-gray-400">
+                <button onClick={() => toggleSort('created_at')} className="flex items-center gap-1 hover:text-gray-800">
                   Data/Hora <SortIcon field="created_at" />
                 </button>
               </th>
               {sortedFields.map(f => (
-                <th key={f.id} className="sticky top-0 z-20 bg-gray-50 px-3 py-2 text-left text-xs font-medium text-gray-500 min-w-[160px] border-r border-gray-100">
-                  <button onClick={() => toggleSort(f.id)} className="flex items-center gap-1 hover:text-gray-700 whitespace-nowrap">
+                <th key={f.id} className="sticky top-0 z-20 bg-gray-100 px-3 py-2.5 text-left text-xs font-semibold text-gray-600 min-w-[160px] border-r border-gray-300">
+                  <button onClick={() => toggleSort(f.id)} className="flex items-center gap-1 hover:text-gray-800 whitespace-nowrap">
                     <span className="truncate max-w-[140px]">{f.label}</span>
                     <SortIcon field={f.id} />
                   </button>
                 </th>
               ))}
+              <th className="sticky top-0 z-20 bg-gray-100 min-w-[40px] border-l border-gray-300" />
             </tr>
           </thead>
           <tbody>
-            {sortedResponses.map(r => (
+            {sortedResponses.map((r, ri) => (
               <tr
                 key={r.id}
                 onClick={() => setSelectedResponse(r)}
-                className="hover:bg-blue-50/50 cursor-pointer border-b border-gray-100 group"
+                className={`cursor-pointer border-b border-gray-300 group ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
               >
-                <td className="sticky left-0 z-10 bg-white group-hover:bg-blue-50/50 px-3 py-2 text-xs text-gray-400 whitespace-nowrap border-r border-gray-200 font-mono">
+                <td className="sticky left-0 z-10 bg-inherit group-hover:bg-blue-100/60 px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap border-r-2 border-gray-400 font-mono">
                   {new Date(r.created_at).toLocaleString('pt-BR')}
                 </td>
                 {sortedFields.map(f => {
@@ -247,11 +248,12 @@ export function EditorResponses({ formId }: EditorResponsesProps) {
                   return (
                     <td key={f.id}
                       onClick={e => handleCellClick(e, r, f.id)}
-                      className={`px-3 py-2 text-xs border-r border-gray-50 max-w-[200px] truncate ${val ? 'text-gray-700 cursor-pointer hover:bg-blue-100/50' : 'text-gray-300'}`}>
+                      className={`px-3 py-2.5 text-xs border-r border-gray-200 max-w-[200px] truncate ${val ? 'text-gray-700 cursor-pointer hover:bg-blue-100/60' : 'text-gray-300'}`}>
                       {val || '—'}
                     </td>
                   )
                 })}
+                <td className="border-l border-gray-200" />
               </tr>
             ))}
           </tbody>
