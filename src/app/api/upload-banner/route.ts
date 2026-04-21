@@ -27,12 +27,15 @@ export async function POST(request: NextRequest) {
   const ext = file.name.split('.').pop() || 'png'
   const path = `${user.id}/${Date.now()}.${ext}`
 
+  const arrayBuffer = await file.arrayBuffer()
+  const fileBuffer = new Uint8Array(arrayBuffer)
+
   const { error } = await supabase.storage
     .from('form-banners')
-    .upload(path, file, { contentType: file.type, upsert: true })
+    .upload(path, fileBuffer, { contentType: file.type, upsert: true })
 
   if (error) {
-    return NextResponse.json({ error: 'Erro ao fazer upload' }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Erro ao fazer upload' }, { status: 500 })
   }
 
   const { data: { publicUrl } } = supabase.storage

@@ -2,7 +2,7 @@
 
 import { useFormEditorStore } from '@/stores/useFormEditorStore'
 import { useEffect, useState, useRef } from 'react'
-import { Palette, RotateCcw, Type, Image, Droplets, Upload, Loader2, X } from 'lucide-react'
+import { Palette, RotateCcw, Type, Image, Droplets, Upload, Loader2, X, Code } from 'lucide-react'
 
 const FONT_OPTIONS = [
   { value: 'Inter', label: 'Inter (Padrão)' },
@@ -79,6 +79,7 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
   const headerColor = config.headerColor || '#ffffff'
   const bannerUrl = config.banner_url || ''
   const fontFamily = config.font_family || 'Inter'
+  const metaPixelId = config.meta_pixel_id || ''
   const previewFields = fields.slice(0, 4)
 
   return (
@@ -215,7 +216,7 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
         )}
 
         {/* Font Family */}
-        <div className="p-4 space-y-3">
+        <div className="p-4 border-b border-gray-100 space-y-3">
           <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
             <Type size={13} /> Fonte
           </label>
@@ -228,6 +229,43 @@ export function EditorDesigner({ formId: _formId }: EditorDesignerProps) {
               <option key={f.value} value={f.value}>{f.label}</option>
             ))}
           </select>
+        </div>
+
+        {/* Meta Pixel Tracking */}
+        <div className="p-4 space-y-3">
+          <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+            <Code size={13} /> Rastreamento (Meta Pixel)
+          </label>
+          <input
+            type="text"
+            value={metaPixelId}
+            onChange={e => updateConfig('meta_pixel_id', e.target.value)}
+            placeholder="Ex: 123456789"
+            className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg font-mono"
+          />
+          <p className="text-[10px] text-gray-400 leading-relaxed">
+            Cole apenas o ID do Pixel. Eventos disparados automaticamente:
+          </p>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+              <span className="text-gray-500"><span className="font-mono text-gray-600">PageView</span> — ao carregar o formulário</span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <span className="text-gray-500"><span className="font-mono text-gray-600">InitiateCheckout</span> — ao clicar "Enviar"</span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+              <span className="text-gray-500"><span className="font-mono text-gray-600">Lead</span> — na página de obrigado</span>
+            </div>
+          </div>
+          {metaPixelId && (
+            <button onClick={() => updateConfig('meta_pixel_id', '')}
+              className="text-[10px] text-red-400 hover:text-red-600">
+              Remover pixel
+            </button>
+          )}
         </div>
       </div>
 

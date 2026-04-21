@@ -10,6 +10,12 @@ interface PublicFormClientProps {
   form: FormWithFields
 }
 
+declare global {
+  interface Window {
+    fbq?: (...args: unknown[]) => void
+  }
+}
+
 export function PublicFormClient({ form }: PublicFormClientProps) {
   const [responses, setResponses] = useState<Record<string, string | string[]>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -17,6 +23,56 @@ export function PublicFormClient({ form }: PublicFormClientProps) {
   const [submitted, setSubmitted] = useState(false)
 
   const fields = (form.fields || []).sort((a, b) => a.ordem - b.ordem)
+  const config = (form.configuracoes || {}) as Record<string, string>
+
+  // Load Google Font
+  useEffect(() => {
+    if (config.font_family && config.font_family !== 'Inter') {
+      const existing = document.querySelector(`link[data-hurtz-font="${config.font_family}"]`)
+      if (existing) return
+      const link = document.createElement('link')
+      link.href = `https://fonts.googleapis.com/css2?family=${config.font_family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
+      link.rel = 'stylesheet'
+      link.setAttribute('data-hurtz-font', config.font_family)
+      document.head.appendChild(link)
+    }
+  }, [config.font_family])
+
+  // Load Meta Pixel
+  useEffect(() => {
+    if (!config.meta_pixel_id) return
+    const pixelId = config.meta_pixel_id
+
+    const existingScript = document.querySelector('script[data-hurtz-meta-pixel]')
+    if (existingScript) return
+
+    const script = document.createElement('script')
+    script.setAttribute('data-hurtz-meta-pixel', pixelId)
+    script.innerHTML = `
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '${pixelId}');
+      fbq('track', 'PageView');
+    `
+    document.head.appendChild(script)
+
+    return () => {
+      script.remove()
+    }
+  }, [config.meta_pixel_id])
+
+  // Fire Lead event on thank you page
+  useEffect(() => {
+    if (submitted && config.meta_pixel_id && window.fbq) {
+      window.fbq('track', 'Lead')
+    }
+  }, [submitted, config.meta_pixel_id])
 
   const handleChange = (fieldId: string, value: string | string[]) => {
     setResponses(prev => ({ ...prev, [fieldId]: value }))
@@ -51,6 +107,11 @@ export function PublicFormClient({ form }: PublicFormClientProps) {
     e.preventDefault()
     if (!validate()) return
 
+    // Fire InitiateCheckout event when user submits
+    if (config.meta_pixel_id && window.fbq) {
+      window.fbq('track', 'InitiateCheckout')
+    }
+
     setSubmitting(true)
     try {
       const res = await fetch('/api/responses', {
@@ -70,20 +131,6 @@ export function PublicFormClient({ form }: PublicFormClientProps) {
   if (submitted) {
     return <ThankYou titulo={form.titulo} />
   }
-
-  const config = (form.configuracoes || {}) as Record<string, string>
-
-  useEffect(() => {
-    if (config.font_family && config.font_family !== 'Inter') {
-      const existing = document.querySelector(`link[data-hurtz-font="${config.font_family}"]`)
-      if (existing) return
-      const link = document.createElement('link')
-      link.href = `https://fonts.googleapis.com/css2?family=${config.font_family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
-      link.rel = 'stylesheet'
-      link.setAttribute('data-hurtz-font', config.font_family)
-      document.head.appendChild(link)
-    }
-  }, [config.font_family])
 
   return (
     <div className="min-h-screen bg-gray-50" style={{
