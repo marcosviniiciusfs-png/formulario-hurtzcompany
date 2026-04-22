@@ -45,6 +45,7 @@ export interface Profile {
   nome: string
   email: string
   avatar_url: string | null
+  logo_url: string | null
   created_at: string
 }
 

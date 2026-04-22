@@ -5,6 +5,7 @@ import { parseOpcoes, parseCanvasMeta } from '@/lib/utils'
 
 interface FormEditorState {
   form: {
+    id: string
     titulo: string
     descricao: string
     slug: string
@@ -31,6 +32,7 @@ interface FormEditorState {
 
 const initialState = {
   form: {
+    id: '',
     titulo: '',
     descricao: '',
     slug: '',
@@ -121,6 +123,7 @@ export const useFormEditorStore = create<FormEditorState>((set, get) => ({
     }))
     set({
       form: {
+        id: form.id,
         titulo: form.titulo,
         descricao: form.descricao || '',
         slug: form.slug,

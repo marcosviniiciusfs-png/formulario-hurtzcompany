@@ -6,6 +6,7 @@ import { LayoutDashboard, FileText, LayoutTemplate, Settings, LogOut, Plus } fro
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useEffect, useState } from 'react'
 
 const navItems = [
   { href: '/dashboard', label: 'Visão geral', icon: LayoutDashboard },
@@ -17,6 +18,18 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchLogo = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('logo_url').eq('id', user.id).single()
+      if (data?.logo_url) setLogoUrl(data.logo_url)
+    }
+    fetchLogo()
+  }, [])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -28,8 +41,13 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col">
       <div className="p-6 border-b border-gray-100">
-        <Link href="/dashboard" className="text-xl font-bold text-gray-900">
-          Hurtz Forms
+        <Link href="/dashboard" className="flex items-center gap-2.5">
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">H</div>
+          )}
+          <span className="text-xl font-bold text-gray-900">Hurtz Forms</span>
         </Link>
       </div>
 

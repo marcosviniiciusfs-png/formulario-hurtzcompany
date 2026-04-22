@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useFormEditorStore } from '@/stores/useFormEditorStore'
 import { FormEditor } from '@/components/editor/FormEditor'
 import { FormWithFields, CollabRole } from '@/types'
@@ -12,20 +12,17 @@ interface FormEditorClientProps {
 }
 
 export function FormEditorClient({ formId, initialData, collabRole }: FormEditorClientProps) {
-  const { loadForm, resetStore } = useFormEditorStore()
-  const loadedId = useRef<string | null>(null)
+  const { loadForm, resetStore, form } = useFormEditorStore()
 
   useEffect(() => {
     if (initialData) {
-      if (loadedId.current !== initialData.id) {
+      if (!form || form.id !== initialData.id) {
         loadForm(initialData, initialData.fields || [])
-        loadedId.current = initialData.id
       }
     } else if (formId === 'new') {
       resetStore()
-      loadedId.current = null
     }
-  }, [initialData, formId, loadForm, resetStore])
+  }, [initialData, formId, loadForm, resetStore, form])
 
   return <FormEditor formId={formId} collabRole={collabRole} />
 }

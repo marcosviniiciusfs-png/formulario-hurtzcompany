@@ -8,8 +8,9 @@ import { FieldProperties } from './FieldProperties'
 import { EditorResponses } from './EditorResponses'
 import { EditorSharing } from './EditorSharing'
 import { EditorDesigner } from './EditorDesigner'
+import { EditorHistory } from './EditorHistory'
 import { FieldType, CollabRole } from '@/types'
-import { List, FileText, LayoutGrid, Save, Eye, Rocket, Sparkles, Loader2, MessageSquare, Copy, Check, Share2, Palette } from 'lucide-react'
+import { List, FileText, LayoutGrid, Save, Eye, Rocket, Sparkles, Loader2, MessageSquare, Copy, Check, Share2, Palette, Clock } from 'lucide-react'
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { generateSlug } from '@/lib/utils'
@@ -26,7 +27,7 @@ export function FormEditor({ formId, collabRole }: FormEditorProps) {
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [showAiPanel, setShowAiPanel] = useState(false)
-  const [activeTab, setActiveTab] = useState<'editor' | 'designer' | 'responses' | 'sharing'>('editor')
+  const [activeTab, setActiveTab] = useState<'editor' | 'designer' | 'responses' | 'sharing' | 'history'>('editor')
   const [copied, setCopied] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
   const router = useRouter()
@@ -228,6 +229,12 @@ export function FormEditor({ formId, collabRole }: FormEditorProps) {
             <Share2 size={12} /> Compartilhar
           </button>
           )}
+          {isOwner && formId !== 'new' && (
+          <button onClick={() => setActiveTab('history')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-t-lg transition-colors flex items-center gap-1 ${activeTab === 'history' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+            <Clock size={12} /> Histórico
+          </button>
+          )}
         </div>
       </div>
 
@@ -269,6 +276,8 @@ export function FormEditor({ formId, collabRole }: FormEditorProps) {
           <EditorDesigner formId={formId} />
         ) : activeTab === 'responses' ? (
           <EditorResponses formId={formId} />
+        ) : activeTab === 'history' ? (
+          <EditorHistory formId={formId} />
         ) : (
           <EditorSharing formId={formId} slug={form.slug || generateSlug(form.titulo)} />
         )}
