@@ -94,5 +94,12 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Activity log
+  await supabase.from('form_activity_log').insert({
+    form_id: id, user_id: user.id,
+    action: 'collaborator_added',
+    details: { nome: nome.trim(), email: email.toLowerCase().trim(), role },
+  })
+
   return NextResponse.json(data, { status: 201 })
 }

@@ -87,7 +87,7 @@ export function FormEditor({ formId, collabRole }: FormEditorProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           titulo: form.titulo, descricao: form.descricao, slug,
-          publicado: !form.publicado, configuracoes: form.configuracoes,
+          publicado: !form.publicado, configuracoes: form.configuracoes, _prev_publicado: form.publicado,
           fields: fields.map(f => ({
             tipo: f.tipo, label: f.label, placeholder: f.placeholder,
             obrigatorio: f.obrigatorio, opcoes: f.opcoes, ordem: f.ordem, canvas_meta: f.canvas_meta,

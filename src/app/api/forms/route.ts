@@ -101,6 +101,22 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Activity log
+  await supabase.from('form_activity_log').insert({
+    form_id: form.id,
+    user_id: user.id,
+    action: 'form_created',
+    details: { titulo },
+  })
+  for (const f of (fields || [])) {
+    await supabase.from('form_activity_log').insert({
+      form_id: form.id,
+      user_id: user.id,
+      action: 'field_added',
+      details: { label: f.label, tipo: f.tipo },
+    })
+  }
+
   const { data: fullForm } = await supabase
     .from('forms')
     .select('*, fields(*)')

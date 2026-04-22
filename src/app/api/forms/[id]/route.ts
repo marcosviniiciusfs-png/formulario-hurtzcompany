@@ -83,6 +83,46 @@ export async function PUT(
     }
   }
 
+  // Activity log
+  const prevPublicado = body._prev_publicado
+  if (prevPublicado !== undefined && prevPublicado !== body.publicado) {
+    await supabase.from('form_activity_log').insert({
+      form_id: id, user_id: user.id,
+      action: body.publicado ? 'form_published' : 'form_unpublished',
+      details: { titulo: body.titulo },
+    })
+  } else {
+    await supabase.from('form_activity_log').insert({
+      form_id: id, user_id: user.id,
+      action: 'form_updated',
+      details: { titulo: body.titulo },
+    })
+  }
+
+  // Log field changes
+  if (body.fields) {
+    const { data: oldFields } = await supabase.from('fields').select('label').eq('form_id', id)
+    const oldLabels = new Set((oldFields || []).map(f => f.label))
+    for (const f of body.fields as Record<string, unknown>[]) {
+      if (!oldLabels.has(f.label as string)) {
+        await supabase.from('form_activity_log').insert({
+          form_id: id, user_id: user.id,
+          action: 'field_added',
+          details: { label: f.label, tipo: f.tipo },
+        })
+      }
+    }
+  }
+
+  // Log design changes
+  if (body.configuracoes && Object.keys(body.configuracoes as Record<string, unknown>).length > 0) {
+    await supabase.from('form_activity_log').insert({
+      form_id: id, user_id: user.id,
+      action: 'design_updated',
+      details: { configuracoes: true },
+    })
+  }
+
   const { data: fullForm } = await supabase
     .from('forms')
     .select('*, fields(*)')

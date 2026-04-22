@@ -24,6 +24,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
+  // Get collaborator name before deleting
+  const { data: collab } = await supabase
+    .from('form_collaborators')
+    .select('nome')
+    .eq('id', cid)
+    .single()
+
   const { error } = await supabase
     .from('form_collaborators')
     .delete()
@@ -33,6 +40,13 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // Activity log
+  await supabase.from('form_activity_log').insert({
+    form_id: id, user_id: user.id,
+    action: 'collaborator_removed',
+    details: { nome: collab?.nome || 'Desconhecido' },
+  })
 
   return NextResponse.json({ success: true })
 }
