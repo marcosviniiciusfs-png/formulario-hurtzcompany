@@ -29,6 +29,13 @@ export function Sidebar() {
       if (data?.logo_url) setLogoUrl(data.logo_url)
     }
     fetchLogo()
+
+    const onProfileUpdate = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.logo_url !== undefined) setLogoUrl(detail.logo_url)
+    }
+    window.addEventListener('profile-updated', onProfileUpdate)
+    return () => window.removeEventListener('profile-updated', onProfileUpdate)
   }, [])
 
   const handleLogout = async () => {

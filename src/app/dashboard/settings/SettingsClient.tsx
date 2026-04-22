@@ -26,18 +26,23 @@ export function SettingsClient({ profile, email }: SettingsClientProps) {
   const logoInputRef = useRef<HTMLInputElement>(null)
 
   const handleSave = async () => {
+    if (!nome.trim()) {
+      setMessage('O nome é obrigatório')
+      return
+    }
     setSaving(true)
     setMessage('')
     const supabase = createClient()
     const { error } = await supabase
       .from('profiles')
-      .update({ nome, logo_url: logoUrl || null })
+      .update({ nome: nome.trim(), logo_url: logoUrl || null })
       .eq('id', profile?.id || '')
 
     if (error) {
-      setMessage('Erro ao salvar')
+      setMessage(`Erro ao salvar: ${error.message}`)
     } else {
       setMessage('Salvo com sucesso!')
+      window.dispatchEvent(new CustomEvent('profile-updated', { detail: { logo_url: logoUrl || null } }))
     }
     setSaving(false)
   }
@@ -46,15 +51,18 @@ export function SettingsClient({ profile, email }: SettingsClientProps) {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) return
-    if (file.size > 2 * 1024 * 1024) return
+    if (file.size > 5 * 1024 * 1024) return
 
     setUploadingLogo(true)
-    const reader = new FileReader()
-    reader.onload = () => {
-      setLogoUrl(reader.result as string)
+    try {
+      const dataUrl = await resizeImage(file, 256, 0.85)
+      setLogoUrl(dataUrl)
+    } catch {
+      setMessage('Erro ao processar imagem')
+    } finally {
       setUploadingLogo(false)
+      if (logoInputRef.current) logoInputRef.current.value = ''
     }
-    reader.readAsDataURL(file)
   }
 
   const handlePasswordChange = async () => {
@@ -158,4 +166,31 @@ export function SettingsClient({ profile, email }: SettingsClientProps) {
       </div>
     </div>
   )
+}
+
+function resizeImage(file: File, maxSize: number, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      let { width, height } = img
+      if (width > maxSize || height > maxSize) {
+        if (width > height) {
+          height = Math.round((height / width) * maxSize)
+          width = maxSize
+        } else {
+          width = Math.round((width / height) * maxSize)
+          height = maxSize
+        }
+      }
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return reject(new Error('Canvas not supported'))
+      ctx.drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = URL.createObjectURL(file)
+  })
 }
