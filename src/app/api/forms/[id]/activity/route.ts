@@ -46,8 +46,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   if (collabIds.length > 0) {
-    const { data: collabs } = await supabase.from('form_collaborators').select('id, nome, avatar_url').in('id', collabIds)
-    collabs?.forEach(c => { collabMap[c.id] = { nome: c.nome, avatar_url: c.avatar_url } })
+    const { data: collabs } = await supabase.from('form_collaborators').select('id, nome').in('id', collabIds)
+    collabs?.forEach(c => { collabMap[c.id] = { nome: c.nome, avatar_url: null } })
   }
 
   const result = enriched.map(a => {

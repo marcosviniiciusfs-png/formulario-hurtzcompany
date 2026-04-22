@@ -21,7 +21,7 @@ export function SettingsClient({ profile, email }: SettingsClientProps) {
   const [savingSenha, setSavingSenha] = useState(false)
   const [senhaMsg, setSenhaMsg] = useState('')
 
-  const [logoUrl, setLogoUrl] = useState(profile?.logo_url || '')
+  const [logoUrl, setLogoUrl] = useState(profile?.avatar_url || '')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
 
@@ -35,14 +35,14 @@ export function SettingsClient({ profile, email }: SettingsClientProps) {
     const supabase = createClient()
     const { error } = await supabase
       .from('profiles')
-      .update({ nome: nome.trim(), logo_url: logoUrl || null })
+      .update({ nome: nome.trim(), avatar_url: logoUrl || null })
       .eq('id', profile?.id || '')
 
     if (error) {
       setMessage(`Erro ao salvar: ${error.message}`)
     } else {
       setMessage('Salvo com sucesso!')
-      window.dispatchEvent(new CustomEvent('profile-updated', { detail: { logo_url: logoUrl || null } }))
+      window.dispatchEvent(new CustomEvent('profile-updated', { detail: { avatar_url: logoUrl || null } }))
     }
     setSaving(false)
   }

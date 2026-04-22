@@ -25,14 +25,14 @@ export function Sidebar() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('profiles').select('logo_url').eq('id', user.id).single()
-      if (data?.logo_url) setLogoUrl(data.logo_url)
+      const { data } = await supabase.from('profiles').select('avatar_url').eq('id', user.id).single()
+      if (data?.avatar_url) setLogoUrl(data.avatar_url)
     }
     fetchLogo()
 
     const onProfileUpdate = (e: Event) => {
       const detail = (e as CustomEvent).detail
-      if (detail?.logo_url !== undefined) setLogoUrl(detail.logo_url)
+      if (detail?.avatar_url !== undefined) setLogoUrl(detail.avatar_url)
     }
     window.addEventListener('profile-updated', onProfileUpdate)
     return () => window.removeEventListener('profile-updated', onProfileUpdate)
